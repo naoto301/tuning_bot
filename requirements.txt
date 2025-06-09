@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 flask
 line-bot-sdk
 pandas
+=======
+flask
+line-bot-sdk
+pandas
+>>>>>>> 93b71b4 (アップデート)
 python-dotenv
