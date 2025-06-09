@@ -115,7 +115,15 @@ GAS_URL = "https://script.google.com/macros/s/AKfycby1zCP1lvp5H8EtGMmFejH8LQKddr
 
 # JSONファイルからストーリー読み込み
 with open("tuning_kimi_ni_awasete_episode_data_FULL_1to20.json", encoding="utf-8") as f:
-    story_data = json.load(f)
+    raw_data = json.load(f)
+
+# 必要ならdictに整形（後の処理がdict前提なら）
+story_data = {}
+for ep in raw_data:
+    episode_num = ep.get("episode")
+    if episode_num is not None:
+        story_data[str(episode_num)] = ep
+
 print("読み込んだ話数：", list(story_data.keys()))
 
 @app.route("/callback", methods=['POST'])
