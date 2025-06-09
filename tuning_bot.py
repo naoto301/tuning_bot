@@ -44,7 +44,7 @@ def callback():
     except InvalidSignatureError:
         abort(400)
 
-    return "OK"
+    return "OK", 200
 
 def is_premium_user(user_id):
     try:
