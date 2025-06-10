@@ -26,14 +26,17 @@ with open("tuning_kimi_ni_awasete_episode_data_FULL_1to20.json", encoding="utf-8
     raw_data = json.load(f)
 
 # list→dict へ変換。キーは話数の文字列 "1"〜"20" に
+# 値は {"subtitle": "...", "texts": [...]} の形で格納
 story_data = {}
 for ep in raw_data:
     num = ep.get("episode")
     if num is None:
         continue
-    # "texts" or "messages" or "lines" のいずれかに入っているはず
+    # サブタイトルを取る
+    subtitle = ep.get("subtitle") or ep.get("title") or ""
+    # 本文は texts or messages or lines
     texts = ep.get("texts") or ep.get("messages") or ep.get("lines") or []
-    story_data[str(num)] = texts
+    story_data[str(num)] = {"subtitle": subtitle, "texts": texts}
 
 print("読み込んだ話数：", list(story_data.keys()))
 
@@ -102,9 +105,16 @@ def handle_message(event):
         )
         return
 
-    # 話数を返す
-    lines = story_data[num]
-    msgs = [TextSendMessage(text=line) for line in lines]
+    # 話数を返す（サブタイトル→本文）
+    ep = story_data[num]
+    msgs = []
+    # サブタイトルがあれば最初の吹き出し
+    if ep["subtitle"]:
+        msgs.append(TextSendMessage(text=ep["subtitle"]))
+    # 本文（吹き出し２〜５）
+    for line in ep["texts"]:
+        msgs.append(TextSendMessage(text=line))
+
     line_bot_api.reply_message(event.reply_token, msgs)
 
 # 本番環境は gunicorn で起動するため、ここはコメントアウト
