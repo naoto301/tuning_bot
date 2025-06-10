@@ -19,7 +19,7 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler      = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # プレミアム判定用 GAS エンドポイント（必要に応じて変更）
-GAS_URL = "https://script.google.com/macros/s/AKfycby1zCP1lvp5H8EtGMmFejH8LQKddrtCj--1mLxXBd7BMHK08Ep3CduPLvdw7dbZy0vyaw/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbyxTlfH6bMA8eADWYJ4ApnGn-R45mxXM2EKQw8-EdzTvpCMKISoCpsvjSaoKzsVJoa8tQ/exec"
 
 # JSONファイルからストーリー読み込み（リスト形式）
 with open("tuning_kimi_ni_awasete_episode_data_FULL_1to20.json", encoding="utf-8") as f:
