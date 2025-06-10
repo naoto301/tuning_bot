@@ -13,83 +13,101 @@ load_dotenv()
 app = Flask(__name__)
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.getenv("CHANNEL_SECRET")
+LINE_CHANNEL_SECRET       = os.getenv("CHANNEL_SECRET")
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
+handler      = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# GASエンドポイント（必要に応じて変更）
+# プレミアム判定用 GAS エンドポイント（必要に応じて変更）
 GAS_URL = "https://script.google.com/macros/s/AKfycby1zCP1lvp5H8EtGMmFejH8LQKddrtCj--1mLxXBd7BMHK08Ep3CduPLvdw7dbZy0vyaw/exec"
 
-# JSONファイルからストーリー読み込み
+# JSONファイルからストーリー読み込み（リスト形式）
 with open("tuning_kimi_ni_awasete_episode_data_FULL_1to20.json", encoding="utf-8") as f:
     raw_data = json.load(f)
 
-# 必要ならdictに整形（後の処理がdict前提なら）
+# list→dict へ変換。キーは話数の文字列 "1"〜"20" に
 story_data = {}
 for ep in raw_data:
-    episode_num = ep.get("episode")
-    if episode_num is not None:
-        story_data[str(episode_num)] = ep
+    num = ep.get("episode")
+    if num is None:
+        continue
+    # "texts" or "messages" or "lines" のいずれかに入っているはず
+    texts = ep.get("texts") or ep.get("messages") or ep.get("lines") or []
+    story_data[str(num)] = texts
 
 print("読み込んだ話数：", list(story_data.keys()))
 
-@app.route("/callback", methods=['POST'])
+@app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers["X-Line-Signature"]
-    body = request.get_data(as_text=True)
-
+    # Webhook受信時には必ず 200 を返す
+    signature = request.headers.get("X-Line-Signature", "")
+    body      = request.get_data(as_text=True)
+    print("=== Webhook受信 ===", body)
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
-
     return "OK", 200
 
-def is_premium_user(user_id):
+def is_premium_user(user_id: str) -> bool:
     try:
-        response = requests.get(GAS_URL, params={"user_id": user_id})
-        return response.json().get("exists", False)
+        resp = requests.get(GAS_URL, params={"user_id": user_id}, timeout=5)
+        return resp.json().get("exists", False)
     except:
         return False
 
-def register_premium_user(user_id):
+def register_premium_user(user_id: str):
     try:
-        requests.post(GAS_URL, json={"user_id": user_id})
+        requests.post(GAS_URL, json={"user_id": user_id}, timeout=5)
     except:
         pass
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_id = event.source.user_id
-    text = event.message.text.strip()
+    print("=== メッセージ受信 ===", event.message.text)
+    user_msg = event.message.text.strip()
+    user_id  = event.source.user_id
 
-    if text == "tuning_kiminiawasete_unlock":
+    # プレミアム解放コード
+    if user_msg == "tuning_2025_unlock":
         register_premium_user(user_id)
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="✅ プレミアム解放完了しました。\n第6話以降が読めるようになります。")
+            TextSendMessage(text="✅ プレミアム解放完了！第6話以降が読めるようになりました。")
         )
         return
 
-    match = re.search(r'(\d{1,2})', text)
-    if match:
-        story_number = match.group(1)
+    # 数字のみマッチ
+    m = re.fullmatch(r"(\d{1,2})", user_msg)
+    if not m:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="『3』のように数字で話数を送ってください。")
+        )
+        return
 
-        if story_number in story_data:
-            if int(story_number) > 5 and not is_premium_user(user_id):
-                pay_message = TextSendMessage(
-                    text="🔒 第6話以降はプレミアム限定です。\n\n▼解放コードはこちらで販売中\nhttps://note.com/loyal_cosmos1726/n/n02affd979258"
-                )
-                line_bot_api.reply_message(event.reply_token, pay_message)
-                return
+    num = m.group(1)
+    if num not in story_data:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=f"{num}話は存在しません。1〜20の数字を送ってください。")
+        )
+        return
 
-            messages = [TextSendMessage(text=msg) for msg in story_data[story_number]["episodes"]]
-            line_bot_api.reply_message(event.reply_token, messages)
-            return
+    # プレミアム制御
+    if int(num) > 5 and not is_premium_user(user_id):
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="🔒 第6話以降はプレミアム限定です。\n解放コードを送信してください。")
+        )
+        return
 
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text="『3』のように数字で話数を送ってください。")
-    )
+    # 話数を返す
+    lines = story_data[num]
+    msgs = [TextSendMessage(text=line) for line in lines]
+    line_bot_api.reply_message(event.reply_token, msgs)
 
+# 本番環境は gunicorn で起動するため、ここはコメントアウト
+# if __name__ == "__main__":
+#     port = int(os.environ.get("PORT", 10000))
+#     app.run(host="0.0.0.0", port=port)
