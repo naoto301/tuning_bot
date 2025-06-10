@@ -101,7 +101,7 @@ def handle_message(event):
     if int(num) > 5 and not is_premium_user(user_id):
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="🔒 第6話以降はプレミアム限定です。\n解放コードを送信してください。")
+            TextSendMessage(text="🔒 第6話以降はプレミアム限定です。\nhttps://note.com/loyal_cosmos1726/n/nefdff71e226fから解放コードを取得してください。")
         )
         return
 
